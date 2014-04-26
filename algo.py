@@ -1,5 +1,7 @@
-from kcube import *
 from subprocess import Popen, PIPE, STDOUT
+
+from kcube import *
+from pq import *
 
 filepath = 'input.txt'
 prog = ['tclsh', 'f.tcl']
@@ -27,15 +29,25 @@ def get_xs_key(xvec):
 
 def algo(f, cubes, max_iter = 5):
   i = 0
-  s = Queue(cubes)
+  s = MinPriorityQueue()
+
   seen_cubes = {}
   table_xvec_to_y = {}
 
   y_min = float('inf')
   xvec_at_y_min = None
 
+  j = 0
+  for c in cubes:
+    s.insert_with_priority(c, j)
+    # seen_cubes[c.get_tag()] = True
+    j += 1
+
   while not s.empty() and i < max_iter:
-    c = s.dequeue()
+    # c = s.dequeue()
+    print c.get_tag()
+
+    c = s.delMin()
     seen_cubes[c.get_tag()] = True
 
     xs = c.vertices()
@@ -45,9 +57,9 @@ def algo(f, cubes, max_iter = 5):
       xs_key = get_xs_key(xvec)
       if not table_xvec_to_y.has_key(xs_key):
         y = f(xvec)
-        table_xvec_to_y[xs_key] = y
+        table_xvec_to_y[xs_key] = (y,) + xvec
 
-      y = table_xvec_to_y[xs_key]
+      y = table_xvec_to_y[xs_key][0]
 
       if y < y_min:
         y_min = y
@@ -57,14 +69,25 @@ def algo(f, cubes, max_iter = 5):
 
     refine_vec = get_refine_vector(c, ys)
 
-    for nc in c.subdivide(refine_vec):
+
+    yavg = sum(ys) / len(ys)
+
+
+    new_cubes = c.subdivide(refine_vec);
+    # print len(ys)
+    # print yavg
+
+    for nc in new_cubes:
       nc_tag = nc.get_tag()
       if not seen_cubes.has_key(nc_tag):
-        s.enqueue(nc)
+        # s.enqueue(nc)
+        s.insert_with_priority(nc, yavg)
 
     i = i + 1
 
-  return (table_xvec_to_y, y_min, xvec_at_y_min)
+  return (table_xvec_to_y.values(), y_min, xvec_at_y_min)
+
+
 
 class Stack:
   def __init__(self, items):
@@ -97,8 +120,8 @@ if __name__ == '__main__':
 
   cubes0 = KCube([(-1, 1), (-1, 1)]).subdivide([0.5, 0.5])
 
-  tb, ymin, xatymin = algo(eval_fun, cubes0)
+  vals, ymin, xatymin = algo(eval_fun, cubes0)
 
-  print tb
+  print vals
   print ymin
   print xatymin
