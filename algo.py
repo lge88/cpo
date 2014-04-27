@@ -1,5 +1,6 @@
 from subprocess import Popen, PIPE, STDOUT
 import operator
+from random import random
 
 from kcube import KCube
 from pq import MinPriorityQueue
@@ -42,7 +43,6 @@ def eval_fun_for_vertices(f, vertices, memo):
   return ys
 
 def algo(f, cubes, max_iter = 5):
-  i = 0
   q = MinPriorityQueue()
 
   seen_cubes = {}
@@ -51,12 +51,12 @@ def algo(f, cubes, max_iter = 5):
   y_min = float('inf')
   xvec_at_y_min = None
 
-  j = 0
+  # Init with random priority:
   for cube in cubes:
-    q.insert_with_priority(cube, j)
+    q.insert_with_priority(cube, random())
     seen_cubes[cube.get_tag()] = True
-    j += 1
 
+  i = 0
   while not q.empty() and i < max_iter:
     cube = q.delMin()
 
@@ -64,8 +64,8 @@ def algo(f, cubes, max_iter = 5):
     new_cubes = cube.subdivide(refine_vec)
 
     for new_cube in new_cubes:
-      new_cube_tag = new_cube.get_tag()
 
+      new_cube_tag = new_cube.get_tag()
       if seen_cubes.has_key(new_cube_tag): continue
 
       seen_cubes[new_cube_tag] = True
