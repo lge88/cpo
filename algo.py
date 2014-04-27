@@ -1,7 +1,8 @@
 from subprocess import Popen, PIPE, STDOUT
+import operator
 
-from kcube import *
-from pq import *
+from kcube import KCube
+from pq import MinPriorityQueue
 
 filepath = 'input.txt'
 prog = ['tclsh', 'f.tcl']
@@ -16,76 +17,74 @@ def eval_fun(xvec):
   p = Popen(prog, stdout = PIPE, stdin = PIPE)
 
   lines = ''.join([str(x) + '\n' for x in xvec])
-  out = p.communicate(input=lines)[0]
+  out = p.communicate(input = lines)[0]
 
   return float(out)
 
-def get_refine_vector(cube, ys, criteria=None):
+def get_refine_vector(f, cube):
   d = cube.dim()
   return [0.5 for x in range(d)]
 
 def get_xs_key(xvec):
   return '_'.join([str(x) for x in xvec])
 
+def eval_fun_for_vertices(f, vertices, memo):
+  ys = []
+  for vert in vertices:
+    xs_key = get_xs_key(vert)
+    if not memo.has_key(xs_key):
+      y = f(vert)
+      memo[xs_key] = (y,) + vert
+
+    y = memo[xs_key][0]
+    ys.append(y)
+
+  return ys
+
 def algo(f, cubes, max_iter = 5):
   i = 0
-  s = MinPriorityQueue()
+  q = MinPriorityQueue()
 
   seen_cubes = {}
-  table_xvec_to_y = {}
+  memo = {}
 
   y_min = float('inf')
   xvec_at_y_min = None
 
   j = 0
-  for c in cubes:
-    s.insert_with_priority(c, j)
-    # seen_cubes[c.get_tag()] = True
+  for cube in cubes:
+    q.insert_with_priority(cube, j)
+    seen_cubes[cube.get_tag()] = True
     j += 1
 
-  while not s.empty() and i < max_iter:
-    # c = s.dequeue()
-    print c.get_tag()
+  while not q.empty() and i < max_iter:
+    cube = q.delMin()
 
-    c = s.delMin()
-    seen_cubes[c.get_tag()] = True
+    refine_vec = get_refine_vector(f, cube)
+    new_cubes = cube.subdivide(refine_vec)
 
-    xs = c.vertices()
-    ys = []
+    for new_cube in new_cubes:
+      new_cube_tag = new_cube.get_tag()
 
-    for xvec in xs:
-      xs_key = get_xs_key(xvec)
-      if not table_xvec_to_y.has_key(xs_key):
-        y = f(xvec)
-        table_xvec_to_y[xs_key] = (y,) + xvec
+      if seen_cubes.has_key(new_cube_tag): continue
 
-      y = table_xvec_to_y[xs_key][0]
+      seen_cubes[new_cube_tag] = True
 
-      if y < y_min:
-        y_min = y
-        xvec_at_y_min = xvec
+      vertices = new_cube.vertices()
+      ys = eval_fun_for_vertices(f, vertices, memo)
 
-      ys.append(y)
+      y_min_index, y_min_value = min(enumerate(ys), key=operator.itemgetter(1))
+      y_avg = sum(ys) / len(ys)
 
-    refine_vec = get_refine_vector(c, ys)
+      if y_min_value < y_min:
+        y_min = y_min_value
+        xvec_at_y_min = vertices[y_min_index]
 
-
-    yavg = sum(ys) / len(ys)
-
-
-    new_cubes = c.subdivide(refine_vec);
-    # print len(ys)
-    # print yavg
-
-    for nc in new_cubes:
-      nc_tag = nc.get_tag()
-      if not seen_cubes.has_key(nc_tag):
-        # s.enqueue(nc)
-        s.insert_with_priority(nc, yavg)
+      q.insert_with_priority(new_cube, y_avg)
 
     i = i + 1
 
-  return (table_xvec_to_y.values(), y_min, xvec_at_y_min)
+  return (memo.values(), y_min, xvec_at_y_min)
 
 
 
@@ -116,7 +115,6 @@ class Queue:
     return len(self._items) == 0
 
 if __name__ == '__main__':
-  # xvec = read_initial_input(filepath)
 
   cubes0 = KCube([(-1, 1), (-1, 1)]).subdivide([0.5, 0.5])
 
